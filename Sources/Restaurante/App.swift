@@ -922,6 +922,12 @@ struct ContentView: View {
                     .tabItem { Label("Ventas", systemImage: "banknote") }
                 ClienteView()
                     .tabItem { Label("Cliente", systemImage: "person") }
+                CajaView()
+                    .tabItem { Label("Caja", systemImage: "banknote.fill") }
+                ClientesView()
+                    .tabItem { Label("Clientes", systemImage: "person.2.fill") }
+                ReportesView()
+                    .tabItem { Label("Reportes", systemImage: "chart.bar.fill") }
                 NegocioView()
                     .tabItem { Label("Mi negocio", systemImage: "storefront") }
                 RedLocalView(red: store.red)
@@ -1061,164 +1067,306 @@ struct MesasView: View {
     }
 }
 
-// MARK: - Menú / Comanda
+// MARK: - Menú / Comanda (con descuento, cliente, domicilio y escáner)
 
 struct MenuView: View {
     @EnvironmentObject var store: DataStore
     @State private var mesa: Int = 1
+    @State private var tipoPedido = "Mesa"
     @State private var carrito: [PedidoItem] = []
     @State private var mensaje = ""
+    @State private var variante = ""
+    @State private var descuentoTexto = ""
+    @State private var descuentoEsPorcentaje = true
+    @State private var clienteSeleccionado: UUID? = nil
+    @State private var direccion = ""
+    @State private var telefono = ""
+    @State private var mostrarEscaner = false
+    @State private var codigoManual = ""
 
-    var total: Double { carrito.reduce(0) { $0 + $1.subtotal } }
+    var subtotal: Double { carrito.reduce(0) { $0 + $1.subtotal } }
+    var descuento: Double {
+        let v = Double(descuentoTexto) ?? 0
+        return descuentoEsPorcentaje ? subtotal * v / 100 : v
+    }
+    var total: Double { max(0, subtotal - descuento) }
 
     var body: some View {
         NavigationStack {
             VStack {
-                Picker("Mesa", selection: $mesa) {
-                    ForEach(1...8, id: \.self) { n in Text("Mesa \(n)").tag(n) }
+                Picker("Tipo de pedido", selection: $tipoPedido) {
+                    Text("🍽️ En mesa").tag("Mesa")
+                    Text("🛍️ Para llevar").tag("Para llevar")
+                    Text("🛵 A domicilio").tag("A domicilio")
                 }
                 .pickerStyle(.segmented)
+                .padding(.horizontal)
+                if tipoPedido == "Mesa" {
+                    Picker("Mesa", selection: $mesa) {
+                        ForEach(1...8, id: \.self) { n in Text("Mesa \(n)").tag(n) }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                } else {
+                    TextField("Dirección de entrega", text: $direccion)
+                        .textFieldStyle(.roundedBorder).padding(.horizontal)
+                    TextField("Teléfono del cliente", text: $telefono)
+                        .keyboardType(.phonePad).textFieldStyle(.roundedBorder).padding(.horizontal)
+                }
+                HStack {
+                    Button("📷 Escanear código") { mostrarEscaner = true }
+                        .buttonStyle(.bordered)
+                    TextField("Código manual", text: $codigoManual)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Buscar") { buscarPorCodigo(codigoManual) }
+                        .buttonStyle(.bordered)
+                }
+                .padding(.horizontal)
+                TextField("Variante (ej. Grande, sin cebolla)", text: $variante)
+                    .textFieldStyle(.roundedBorder).padding(.horizontal)
+                Picker("Cliente (lealtad)", selection: $clienteSeleccionado) {
+                    Text("Sin cliente").tag(nil as UUID?)
+                    ForEach(store.clientes) { cliente in
+                        Text("\(cliente.nombre) · \(cliente.puntos) pts").tag(cliente.id as UUID?)
+                    }
+                }
+                .pickerStyle(.menu)
                 .padding(.horizontal)
 
                 List {
                     ForEach(Array(Dictionary(grouping: store.menu, by: { $0.categoria }).keys.sorted()), id: \.self) { cat in
-                        Section {
+                        Section(cat) {
                             ForEach(store.menu.filter { $0.categoria == cat }) { plato in
-                                HStack(spacing: 12) {
-                                    ZStack {
-                                        Circle().fill(Color.posNaranja.opacity(0.15)).frame(width: 52, height: 52)
-                                        Text(iconoCategoria(plato.categoria)).font(.title2)
-                                    }
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(plato.nombre).font(.headline)
-                                        Text(mxn(plato.precio)).font(.title3).bold().foregroundStyle(.posRojo)
+                                HStack {
+                                    Text(iconoCategoria(cat)).font(.title2)
+                                    VStack(alignment: .leading) {
+                                        Text(plato.nombre)
+                                        HStack {
+                                            Text(mxn(plato.precio)).foregroundStyle(.secondary)
+                                            if let codigo = plato.codigo, !codigo.isEmpty {
+                                                Text("· \(codigo)").font(.caption).foregroundStyle(.secondary)
+                                            }
+                                        }
                                     }
                                     Spacer()
-                                    Button {
-                                        agregar(plato)
-                                    } label: {
-                                        Image(systemName: "plus.circle.fill")
-                                            .font(.system(size: 36))
-                                            .foregroundStyle(LinearGradient(colors: [.posNaranja, .posRojo], startPoint: .topLeading, endPoint: .bottomTrailing))
-                                            .shadow(color: Color.posRojo.opacity(0.30), radius: 6, x: 0, y: 3)
-                                    }
-                                    .buttonStyle(.plain)
+                                    Button("Agregar") { agregar(plato) }
+                                        .buttonStyle(.bordered)
                                 }
-                                .padding(.vertical, 6)
-                                .listRowBackground(Color.white)
-                                .listRowSeparator(.hidden)
                             }
-                        } header: {
-                            Text(cat).font(.headline).bold().foregroundStyle(.posRojo)
                         }
                     }
                 }
-                .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
-                .background(Color.posFondo)
 
                 if !carrito.isEmpty {
                     VStack(spacing: 8) {
                         ForEach(carrito) { item in
                             HStack {
-                                Text("\(item.cantidad) × \(item.nombre)")
+                                Text("\(item.cantidad) × \(item.nombreCompleto)")
                                 Spacer()
                                 Text(mxn(item.subtotal))
                             }
                             .font(.callout)
                         }
-                        Text("Total: \(mxn(total))").font(.title2).bold()
-                        Button("Enviar a cocina — Mesa \(mesa)") {
-                            store.crearPedido(mesa: "Mesa \(mesa)", tipo: "Mesa", items: carrito)
-                            mensaje = "Pedido enviado a cocina."
-                            carrito = []
+                        HStack {
+                            Text("Descuento")
+                            Picker("", selection: $descuentoEsPorcentaje) {
+                                Text("%").tag(true)
+                                Text("$").tag(false)
+                            }
+                            .pickerStyle(.segmented).frame(width: 110)
+                            TextField("0", text: $descuentoTexto)
+                                .keyboardType(.decimalPad).textFieldStyle(.roundedBorder).frame(width: 80)
+                            Spacer()
+                            Text("-\(mxn(descuento))")
                         }
-                        .botonPOS()
+                        Text("Total: \(mxn(total))").bold()
+                        Button(enviarTexto()) {
+                            let mesaTexto = tipoPedido == "Mesa" ? "Mesa \(mesa)" : tipoPedido
+                            let cliente = store.clientes.first { $0.id == clienteSeleccionado }
+                            store.crearPedidoCompleto(mesa: mesaTexto, tipo: "Mesa", tipoPedido: tipoPedido, items: carrito, descuento: descuento, clienteId: clienteSeleccionado, clienteNombre: cliente?.nombre ?? "", direccion: direccion, telefono: telefono)
+                            mensaje = "Pedido enviado a cocina."
+                            carrito = []; descuentoTexto = ""; direccion = ""; telefono = ""
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .frame(maxWidth: .infinity)
                         if !mensaje.isEmpty {
                             Text(mensaje).font(.callout).foregroundStyle(.green)
                         }
                     }
                     .padding()
-                    .background(Color.white)
-                    .cornerRadius(20)
-                    .shadow(color: .black.opacity(0.10), radius: 10, x: 0, y: 4)
-                    .padding()
+                    .background(Color(.secondarySystemBackground))
                 }
             }
-            .background(Color.posFondo)
             .navigationTitle("Menú / Comanda")
+            .sheet(isPresented: $mostrarEscaner) {
+                EscanerCodigoView { codigo in
+                    mostrarEscaner = false
+                    buscarPorCodigo(codigo)
+                }
+            }
+        }
+    }
+
+    private func enviarTexto() -> String {
+        switch tipoPedido {
+        case "Mesa": return "Enviar a cocina — Mesa \(mesa)"
+        case "Para llevar": return "Enviar a cocina — Para llevar"
+        default: return "Enviar a cocina — A domicilio"
         }
     }
 
     private func agregar(_ plato: MenuItem) {
-        if let i = carrito.firstIndex(where: { $0.nombre == plato.nombre }) {
+        let v = variante.trimmingCharacters(in: .whitespaces)
+        if let i = carrito.firstIndex(where: { $0.nombre == plato.nombre && ($0.variante ?? "") == v }) {
             carrito[i].cantidad += 1
         } else {
-            carrito.append(PedidoItem(nombre: plato.nombre, precio: plato.precio, cantidad: 1))
+            carrito.append(PedidoItem(nombre: plato.nombre, precio: plato.precio, cantidad: 1, variante: v.isEmpty ? nil : v, codigo: plato.codigo))
         }
         mensaje = ""
     }
+
+    private func buscarPorCodigo(_ codigo: String) {
+        let limpio = codigo.trimmingCharacters(in: .whitespaces)
+        guard !limpio.isEmpty else { return }
+        if let plato = store.menu.first(where: { ($0.codigo ?? "").lowercased() == limpio.lowercased() }) {
+            agregar(plato)
+            mensaje = "Encontrado por código: \(plato.nombre)"
+        } else if let plato = store.menu.first(where: { $0.nombre.lowercased().contains(limpio.lowercased()) }) {
+            agregar(plato)
+            mensaje = "Encontrado: \(plato.nombre)"
+        } else {
+            mensaje = "No hay platillo con el código \(limpio). Agrégalo en el menú con ese código."
+        }
+        codigoManual = ""
+    }
 }
 
-// MARK: - Cocina
+// MARK: - Escáner de código de barras (cámara, AVFoundation)
+
+struct EscanerCodigoView: View {
+    var alEncontrar: (String) -> Void
+    @Environment(\.dismiss) var dismiss
+    @State private var codigo = ""
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                Text("Apunta la cámara al código de barras del platillo.")
+                    .multilineTextAlignment(.center).padding()
+                EscanerCamaraView(alEncontrar: alEncontrar)
+                    .frame(height: 320).cornerRadius(16).padding(.horizontal)
+                Text("O escríbelo a mano:")
+                HStack {
+                    TextField("Código", text: $codigo).textFieldStyle(.roundedBorder)
+                    Button("Buscar") { if !codigo.isEmpty { alEncontrar(codigo) } }
+                        .buttonStyle(.borderedProminent)
+                }
+                .padding(.horizontal)
+                Button("Cancelar") { dismiss() }.padding()
+            }
+            .navigationTitle("Escanear código")
+        }
+    }
+}
+
+struct EscanerCamaraView: UIViewControllerRepresentable {
+    var alEncontrar: (String) -> Void
+    func makeUIViewController(context: Context) -> EscanerVC {
+        EscanerVC(alEncontrar: alEncontrar)
+    }
+    func updateUIViewController(_ vc: EscanerVC, context: Context) {}
+}
+
+final class EscanerVC: UIViewController, AVCaptureMetadataOutputObjectsDelegate {
+    var alEncontrar: (String) -> Void
+    private let sesion = AVCaptureSession()
+    private var yaEncontro = false
+
+    init(alEncontrar: @escaping (String) -> Void) {
+        self.alEncontrar = alEncontrar
+        super.init(nibName: nil, bundle: nil)
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) no usado") }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        guard let camara = AVCaptureDevice.default(for: .video),
+              let entrada = try? AVCaptureDeviceInput(device: camara),
+              sesion.canAddInput(entrada) else { return }
+        sesion.addInput(entrada)
+        let salida = AVCaptureMetadataOutput()
+        guard sesion.canAddOutput(salida) else { return }
+        sesion.addOutput(salida)
+        salida.setMetadataObjectsDelegate(self, queue: .main)
+        salida.metadataObjectTypes = [.ean8, .ean13, .code128, .qr, .upce]
+        let capa = AVCaptureVideoPreviewLayer(session: sesion)
+        capa.frame = view.bounds
+        capa.videoGravity = .resizeAspectFill
+        view.layer.addSublayer(capa)
+        sesion.startRunning()
+    }
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        view.layer.sublayers?.first?.frame = view.bounds
+    }
+    func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
+        guard !yaEncontro,
+              let objeto = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
+              let codigo = objeto.stringValue else { return }
+        yaEncontro = true
+        sesion.stopRunning()
+        alEncontrar(codigo)
+    }
+}
+
+// MARK: - Cocina (por estado, con tiempo por pedido)
 
 struct CocinaView: View {
     @EnvironmentObject var store: DataStore
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Kanban por estado: Pendiente → En cocina → Listo.
-                    ForEach([EstadoPedido.pendiente, .cocina, .listo], id: \.self) { estado in
-                        let pedidos = store.pedidosActivos.filter { $0.estado == estado }
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                Image(systemName: estado == .listo ? "checkmark.circle.fill" : estado == .cocina ? "flame.fill" : "clock.fill")
-                                    .foregroundStyle(colorEstado(estado))
-                                Text(estado.titulo).font(.title3).bold()
-                                Spacer()
-                                Text("\(pedidos.count)").font(.headline).bold()
-                                    .padding(.horizontal, 12).padding(.vertical, 4)
-                                    .background(colorEstado(estado).opacity(0.18))
-                                    .foregroundStyle(colorEstado(estado))
-                                    .cornerRadius(20)
-                            }
-                            if pedidos.isEmpty {
-                                Text("Sin pedidos \(estado.titulo.lowercased()).").foregroundStyle(.secondary)
-                            }
-                            ForEach(pedidos) { pedido in
-                                VStack(alignment: .leading, spacing: 6) {
-                                    HStack {
-                                        Text("Pedido #\(pedido.numero) · \(pedido.mesa)").font(.headline)
-                                        Spacer()
-                                        Text(mxn(pedido.total)).font(.headline).bold().foregroundStyle(.posRojo)
-                                    }
-                                    ForEach(pedido.items) { item in
-                                        Text("\(item.cantidad) × \(item.nombre)")
-                                    }
-                                    if let sig = pedido.estado.siguiente {
-                                        Button(sig == .cobrado ? "Marcar cobrado" : "Pasar a \(sig.titulo)") {
-                                            store.avanzar(pedido)
-                                        }
-                                        .botonPOS()
-                                    }
-                                }
-                                .padding(12)
-                                .background(colorEstado(estado).opacity(0.10))
-                                .cornerRadius(16)
-                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(colorEstado(estado).opacity(0.35), lineWidth: 1.5))
-                            }
+            List {
+                ForEach([EstadoPedido.pendiente, .cocina, .listo], id: \.self) { estado in
+                    let lista = store.pedidosActivos.filter { $0.estado == estado }
+                    Section("\(estado.titulo) (\(lista.count))") {
+                        if lista.isEmpty {
+                            Text("Nada \(estado.titulo.lowercased()).").foregroundStyle(.secondary)
                         }
-                        .tarjetaPOS()
-                        .padding(.horizontal)
-                    }
-                    if store.pedidosActivos.isEmpty {
-                        Text("No hay pedidos en cocina.").foregroundStyle(.secondary)
+                        ForEach(lista) { pedido in
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text("Pedido #\(pedido.numero) · \(pedido.mesa)")
+                                        .font(.headline)
+                                    Spacer()
+                                    Text("⏱ \(store.minutosPedido(pedido)) min")
+                                        .font(.caption).bold()
+                                        .padding(6)
+                                        .background(store.minutosPedido(pedido) >= 15 ? Color.red.opacity(0.2) : Color.green.opacity(0.2))
+                                        .cornerRadius(8)
+                                }
+                                Text(pedido.tipoPedido)
+                                    .font(.caption).foregroundStyle(.secondary)
+                                if !pedido.clienteNombre.isEmpty {
+                                    Text("Cliente: \(pedido.clienteNombre)").font(.caption)
+                                }
+                                if pedido.tipoPedido == "A domicilio" && !pedido.direccionEntrega.isEmpty {
+                                    Text("📍 \(pedido.direccionEntrega) · \(pedido.telefonoEntrega)").font(.caption)
+                                }
+                                ForEach(pedido.items) { item in
+                                    Text("\(item.cantidad) × \(item.nombreCompleto)")
+                                }
+                                if let sig = pedido.estado.siguiente {
+                                    Button(sig == .cobrado ? "Marcar cobrado" : "Pasar a \(sig.titulo)") {
+                                        store.avanzar(pedido)
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
                     }
                 }
-                .padding(.vertical)
             }
-            .background(Color.posFondo)
             .navigationTitle("Cocina")
         }
     }
@@ -1226,12 +1374,15 @@ struct CocinaView: View {
 
 // MARK: - Inventario
 
+
 struct InventarioView: View {
     @EnvironmentObject var store: DataStore
     @State private var nombre = ""
     @State private var unidad = "kg"
     @State private var stockTexto = ""
     @State private var minimoTexto = ""
+    @State private var csvTexto = ""
+    @State private var mensajeImport = ""
 
     var body: some View {
         NavigationStack {
@@ -1265,6 +1416,23 @@ struct InventarioView: View {
                         }
                     }
                 }
+                Section("Importar / exportar (CSV)") {
+                    Text("Exporta el inventario a CSV para Excel, o pega un CSV con líneas: Nombre,unidad,stock,minimo")
+                        .font(.callout).foregroundStyle(.secondary)
+                    ShareLink(item: store.exportarInventarioCSV(), subject: Text("Inventario")) {
+                        Label("📤 Exportar inventario a CSV", systemImage: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    TextField("Pega aquí el CSV para importar", text: $csvTexto, axis: .vertical)
+                        .textFieldStyle(.roundedBorder)
+                    Button("📥 Importar CSV") {
+                        let n = store.importarInventarioCSV(csvTexto)
+                        mensajeImport = n > 0 ? "Se importaron \(n) productos." : "No se importó nada. Revisa el formato."
+                        csvTexto = ""
+                    }
+                    .buttonStyle(.borderedProminent)
+                    if !mensajeImport.isEmpty { Text(mensajeImport).foregroundStyle(.green).font(.callout) }
+                }
                 Section("Agregar producto") {
                     TextField("Nombre (ej. Tomate)", text: $nombre)
                     TextField("Unidad (kg / pzas / L)", text: $unidad)
@@ -1287,60 +1455,63 @@ struct InventarioView: View {
     }
 }
 
-// MARK: - Ventas del día
+// MARK: - Ventas del día (con devoluciones y exportar CSV)
 
 struct VentasView: View {
     @EnvironmentObject var store: DataStore
+    @State private var motivo = ""
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    VStack(spacing: 12) {
-                        VStack(spacing: 4) {
-                            Text("TOTAL COBRADO HOY").font(.caption).bold().foregroundStyle(.white.opacity(0.85))
-                            Text(mxn(store.ventasDelDia)).font(.largeTitle).bold().foregroundStyle(.white)
-                            Text("Propinas: \(mxn(store.propinasDelDia))").font(.headline).foregroundStyle(.white.opacity(0.90))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(20)
-                        .background(LinearGradient(colors: [.posVerde, Color(red: 0.10, green: 0.55, blue: 0.35)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .cornerRadius(20)
-                        .shadow(color: Color.posVerde.opacity(0.35), radius: 10, x: 0, y: 5)
-                        HStack(spacing: 12) {
-                            VStack {
-                                Text("\(store.pedidos.filter { $0.estado == .cobrado }.count)").font(.title).bold().foregroundStyle(.posRojo)
-                                Text("Cobrados").font(.caption).bold()
-                            }.frame(maxWidth: .infinity).tarjetaPOS()
-                            VStack {
-                                Text("\(store.pedidosActivos.count)").font(.title).bold().foregroundStyle(.posNaranja)
-                                Text("Activos").font(.caption).bold()
-                            }.frame(maxWidth: .infinity).tarjetaPOS()
-                        }
+                Section("Hoy") {
+                    Text("Total cobrado: \(mxn(store.ventasDelDia))")
+                        .font(.title2).bold()
+                    Text("Propinas: \(mxn(store.propinasDelDia))")
+                    Text("Descuentos: \(mxn(store.descuentosDelDia))")
+                    Text("Devoluciones: \(mxn(store.devolucionesDelDia))")
+                    Text("Pedidos cobrados: \(store.pedidosCobrados.count)")
+                    Text("Pedidos activos: \(store.pedidosActivos.count)")
+                    ShareLink(item: store.exportarVentasCSV(), subject: Text("Ventas")) {
+                        Label("📤 Exportar ventas a CSV", systemImage: "square.and.arrow.up")
                     }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
+                    .buttonStyle(.borderedProminent)
                 }
                 Section("Pedidos cobrados") {
-                    let cobrados = store.pedidos.filter { $0.estado == .cobrado }
-                    if cobrados.isEmpty {
+                    if store.pedidosCobrados.isEmpty {
                         Text("Aún no hay ventas cobradas hoy.").foregroundStyle(.secondary)
                     }
-                    ForEach(cobrados) { pedido in
+                    ForEach(store.pedidosCobrados) { pedido in
                         VStack(alignment: .leading, spacing: 2) {
                             HStack {
                                 Text("Pedido #\(pedido.numero) · \(pedido.mesa)")
                                 Spacer()
                                 Text(mxn(pedido.totalConPropina)).bold()
                             }
-                            Text("Comida \(mxn(pedido.total)) + propina \(mxn(pedido.propina))")
+                            Text("Comida \(mxn(pedido.total))" + (pedido.descuento > 0 ? " − descuento \(mxn(pedido.descuento))" : "") + " + propina \(mxn(pedido.propina)) · \(pedido.formaPago)")
                                 .font(.caption).foregroundStyle(.secondary)
+                            HStack {
+                                TextField("Motivo de devolución", text: $motivo)
+                                    .textFieldStyle(.roundedBorder)
+                                Button("↩️ Devolver") {
+                                    store.devolverPedido(pedido, motivo: motivo)
+                                    motivo = ""
+                                }
+                                .buttonStyle(.bordered)
+                            }
                         }
                     }
                 }
+                Section("Devoluciones") {
+                    let devueltos = store.pedidos.filter { $0.devuelto }
+                    if devueltos.isEmpty {
+                        Text("No hay devoluciones.").foregroundStyle(.secondary)
+                    }
+                    ForEach(devueltos) { pedido in
+                        Text("Pedido #\(pedido.numero) · \(mxn(pedido.totalConPropina)) · \(pedido.motivoDevolucion)")
+                            .foregroundStyle(.red)
+                    }
+                }
             }
-            .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
-            .background(Color.posFondo)
             .navigationTitle("Ventas del día")
         }
     }
@@ -1348,12 +1519,16 @@ struct VentasView: View {
 
 // MARK: - Cliente (pedido desde su iPhone)
 
+
 struct ClienteView: View {
     @EnvironmentObject var store: DataStore
     @State private var modo = "Mesa"
     @State private var mesaCliente = 1
     @State private var carrito: [PedidoItem] = []
     @State private var mensaje = ""
+    @State private var nombreCliente = ""
+    @State private var direccionCliente = ""
+    @State private var telefonoCliente = ""
 
     var total: Double { carrito.reduce(0) { $0 + $1.subtotal } }
 
@@ -1367,9 +1542,18 @@ struct ClienteView: View {
                 Picker("¿Dónde estás?", selection: $modo) {
                     Text("En mesa").tag("Mesa")
                     Text("Para llevar").tag("Para llevar")
+                    Text("A domicilio").tag("A domicilio")
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
+                TextField("Tu nombre", text: $nombreCliente)
+                    .textFieldStyle(.roundedBorder).padding(.horizontal)
+                if modo == "A domicilio" {
+                    TextField("Dirección de entrega", text: $direccionCliente)
+                        .textFieldStyle(.roundedBorder).padding(.horizontal)
+                    TextField("Teléfono", text: $telefonoCliente)
+                        .keyboardType(.phonePad).textFieldStyle(.roundedBorder).padding(.horizontal)
+                }
                 if modo == "Mesa" {
                     Picker("Mesa", selection: $mesaCliente) {
                         ForEach(1...8, id: \.self) { n in Text("Mesa \(n)").tag(n) }
@@ -1409,8 +1593,8 @@ struct ClienteView: View {
                     VStack(spacing: 8) {
                         Text("Tu pedido: \(mxn(total))").font(.title2).bold()
                         Button("Enviar mi pedido") {
-                            let mesa = modo == "Mesa" ? "Mesa \(mesaCliente)" : "Para llevar"
-                            store.crearPedido(mesa: mesa, tipo: "Cliente", items: carrito)
+                            let mesa = modo == "Mesa" ? "Mesa \(mesaCliente)" : modo
+                            store.crearPedidoCompleto(mesa: mesa, tipo: "Cliente", tipoPedido: modo, items: carrito, descuento: 0, clienteId: nil, clienteNombre: nombreCliente, direccion: direccionCliente, telefono: telefonoCliente)
                             mensaje = "¡Pedido enviado! Llega a cocina en un momento."
                             carrito = []
                         }
@@ -1444,6 +1628,9 @@ struct CerrarCuentaView: View {
     @State private var propinaManual = ""
     @State private var usarManual = false
     @State private var mesero = ""
+    @State private var descuentoTexto = ""
+    @State private var descuentoEsPorcentaje = true
+    @State private var formaPago = "Efectivo"
 
     var ticketBase: Ticket? { store.ticketParaMesa(mesa) }
     var subtotal: Double { ticketBase?.subtotal ?? 0 }
@@ -1451,7 +1638,11 @@ struct CerrarCuentaView: View {
         if usarManual { return Double(propinaManual) ?? 0 }
         return subtotal * Double(porcentaje) / 100
     }
-    var total: Double { subtotal + propina }
+    var descuentoMonto: Double {
+        let v = Double(descuentoTexto) ?? 0
+        return descuentoEsPorcentaje ? subtotal * v / 100 : v
+    }
+    var total: Double { max(0, subtotal - descuentoMonto) + propina }
 
     var body: some View {
         NavigationStack {
@@ -1498,6 +1689,26 @@ struct CerrarCuentaView: View {
                     }
                     Text("Propina: \(mxn(propina))").font(.title3)
 
+                    Text("Descuento (Loyverse)").font(.title2).bold()
+                    HStack {
+                        Picker("", selection: $descuentoEsPorcentaje) {
+                            Text("%").tag(true)
+                            Text("$").tag(false)
+                        }
+                        .pickerStyle(.segmented).frame(width: 110)
+                        TextField("0", text: $descuentoTexto)
+                            .keyboardType(.decimalPad).textFieldStyle(.roundedBorder).frame(width: 90)
+                        Spacer()
+                        Text("-\(mxn(descuentoMonto))")
+                    }
+                    Text("Forma de pago").font(.title2).bold()
+                    Picker("Forma de pago", selection: $formaPago) {
+                        Text("💵 Efectivo").tag("Efectivo")
+                        Text("💳 Tarjeta").tag("Tarjeta")
+                        Text("🏦 Transferencia").tag("Transferencia")
+                    }
+                    .pickerStyle(.segmented)
+
                     Text("3. ¿Quién atiende?").font(.title2).bold()
                     TextField("Mesero", text: $mesero)
                         .textFieldStyle(.roundedBorder)
@@ -1506,7 +1717,7 @@ struct CerrarCuentaView: View {
                     Divider()
                     Text("TOTAL A COBRAR: \(mxn(total))").font(.title).bold()
                     Button("✅ Cerrar cuenta y ver ticket") {
-                        let ticket = store.cerrarMesa(mesa, propina: propina, mesero: mesero.isEmpty ? store.negocio.mesero : mesero)
+                        let ticket = store.cerrarMesa(mesa, propina: propina, mesero: mesero.isEmpty ? store.negocio.mesero : mesero, descuento: descuentoMonto, formaPago: formaPago)
                         if let ticket = ticket {
                             alCerrar(ticket)
                             dismiss()
@@ -1614,6 +1825,196 @@ struct TicketView: View {
     }
 }
 
+
+// MARK: - Caja (fondo, entradas/salidas, corte)
+
+struct CajaView: View {
+    @EnvironmentObject var store: DataStore
+    @State private var concepto = ""
+    @State private var montoTexto = ""
+    @State private var tipoMovimiento = "salida"
+    @State private var fondoTexto = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Corte de caja") {
+                    Text("Efectivo en caja: \(mxn(store.efectivoEnCaja))").font(.title2).bold()
+                    Text("Fondo inicial: \(mxn(store.fondoInicial))")
+                    ForEach(store.ventasPorPago(), id: \.0) { forma, total in
+                        HStack { Text(forma); Spacer(); Text(mxn(total)).bold() }
+                    }
+                    Text("Ventas hoy: \(mxn(store.ventasDelDia))")
+                    Text("Devoluciones: \(mxn(store.devolucionesDelDia))")
+                }
+                Section("Fondo inicial") {
+                    HStack {
+                        TextField("Fondo en pesos", text: $fondoTexto).keyboardType(.decimalPad)
+                        Button("Guardar fondo") {
+                            store.fondoInicial = Double(fondoTexto) ?? store.fondoInicial
+                            store.guardar()
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+                Section("Entrada / salida de efectivo") {
+                    Picker("Tipo", selection: $tipoMovimiento) {
+                        Text("💰 Entrada").tag("entrada")
+                        Text("💸 Salida").tag("salida")
+                    }
+                    .pickerStyle(.segmented)
+                    TextField("Concepto (ej. Compra de tortillas)", text: $concepto)
+                    TextField("Monto", text: $montoTexto).keyboardType(.decimalPad)
+                    Button("Registrar movimiento") {
+                        store.registrarMovimiento(tipo: tipoMovimiento, concepto: concepto, monto: Double(montoTexto) ?? 0)
+                        concepto = ""; montoTexto = ""
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                Section("Movimientos") {
+                    if store.movimientos.isEmpty {
+                        Text("Sin movimientos de caja todavía.").foregroundStyle(.secondary)
+                    }
+                    ForEach(store.movimientos) { mov in
+                        HStack {
+                            Text(mov.tipo == "entrada" ? "⬆️" : "⬇️")
+                            VStack(alignment: .leading) {
+                                Text(mov.concepto)
+                                Text(fechaCortaMov(mov.fecha)).font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text((mov.tipo == "entrada" ? "+" : "-") + mxn(mov.monto))
+                                .bold().foregroundStyle(mov.tipo == "entrada" ? .green : .red)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Caja")
+            .onAppear { fondoTexto = String(format: "%.0f", store.fondoInicial) }
+        }
+    }
+    private func fechaCortaMov(_ fecha: Date) -> String {
+        let f = DateFormatter()
+        f.dateStyle = .short; f.timeStyle = .short
+        return f.string(from: fecha)
+    }
+}
+
+// MARK: - Clientes y lealtad
+
+struct ClientesView: View {
+    @EnvironmentObject var store: DataStore
+    @State private var nombre = ""
+    @State private var telefono = ""
+    @State private var clienteDetalle: Cliente? = nil
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Registrar cliente") {
+                    Text("1 punto por cada $20 gastados. Los puntos se suman solos al cobrar.")
+                        .font(.callout).foregroundStyle(.secondary)
+                    TextField("Nombre", text: $nombre)
+                    TextField("Teléfono", text: $telefono).keyboardType(.phonePad)
+                    Button("➕ Agregar cliente") {
+                        store.agregarCliente(nombre: nombre, telefono: telefono)
+                        nombre = ""; telefono = ""
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                Section("Clientes (\(store.clientes.count))") {
+                    if store.clientes.isEmpty {
+                        Text("Sin clientes registrados.").foregroundStyle(.secondary)
+                    }
+                    ForEach(store.clientes) { cliente in
+                        Button {
+                            clienteDetalle = cliente
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(cliente.nombre).font(.headline)
+                                    Text(cliente.telefono.isEmpty ? "Sin teléfono" : cliente.telefono)
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                VStack(alignment: .trailing) {
+                                    Text("⭐ \(cliente.puntos) pts").bold()
+                                    Text("\(cliente.visitas) visitas").font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .navigationTitle("Clientes")
+            .sheet(item: $clienteDetalle) { cliente in
+                NavigationStack {
+                    List {
+                        Section("Historial") {
+                            Text("Nombre: \(cliente.nombre)")
+                            Text("Teléfono: \(cliente.telefono.isEmpty ? "—" : cliente.telefono)")
+                            Text("Puntos: \(cliente.puntos)")
+                            Text("Total gastado: \(mxn(cliente.totalGastado))")
+                            Text("Visitas: \(cliente.visitas)")
+                        }
+                        Section("Sus pedidos") {
+                            let lista = store.pedidos.filter { $0.clienteId == cliente.id || $0.clienteNombre == cliente.nombre }
+                            if lista.isEmpty { Text("Sin pedidos registrados.").foregroundStyle(.secondary) }
+                            ForEach(lista) { pedido in
+                                Text("Pedido #\(pedido.numero) · \(pedido.mesa) · \(mxn(pedido.totalConPropina))")
+                            }
+                        }
+                    }
+                    .navigationTitle(cliente.nombre)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Reportes / analítica
+
+struct ReportesView: View {
+    @EnvironmentObject var store: DataStore
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Resumen") {
+                    Text("Hoy: \(mxn(store.ventasDelDia))").font(.title2).bold()
+                    Text("Últimos 7 días: \(mxn(store.ventasSemana))")
+                    Text("Venta promedio: \(mxn(store.ventaPromedio))")
+                    Text("Pedidos cobrados hoy: \(store.pedidosCobrados.count)")
+                }
+                Section("Por forma de pago") {
+                    ForEach(store.ventasPorPago(), id: \.0) { forma, total in
+                        HStack { Text(forma); Spacer(); Text(mxn(total)).bold() }
+                    }
+                }
+                Section("Lo más vendido") {
+                    let top = store.masVendidos()
+                    if top.isEmpty {
+                        Text("Aún no hay ventas.").foregroundStyle(.secondary)
+                    }
+                    ForEach(Array(top.prefix(10)), id: \.0) { nombre, cantidad in
+                        HStack {
+                            Text("🏆 \(nombre)")
+                            Spacer()
+                            Text("\(cantidad) vendidos").bold()
+                        }
+                    }
+                }
+                Section("Exportar") {
+                    ShareLink(item: store.exportarVentasCSV(), subject: Text("Reporte de ventas")) {
+                        Label("📤 Exportar ventas a CSV (Excel)", systemImage: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+            .navigationTitle("Reportes")
+        }
+    }
+}
 
 // MARK: - Red local (sincronizar varios iPhones por WiFi)
 

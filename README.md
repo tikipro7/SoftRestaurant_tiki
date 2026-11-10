@@ -27,6 +27,7 @@ App SwiftUI para iPhone, para el restaurante y para el cliente. Sin servidor, si
 - **Mi negocio:** pestaña nueva para poner nombre del restaurante, dirección, teléfono, mesero y elegir el logo desde la galería (PhotosPicker). El logo se guarda en local y sale arriba del ticket; sin logo, solo sale el nombre en grande.
 - **Red local (WiFi, varios iPhones):** pestaña nueva "Red local". Todos los iPhones con la app, en el mismo WiFi, se encuentran por MultipeerConnectivity (Bonjour, servicio `tiki-comanda`), se conectan y se sincronizan pedidos, mesas, inventario y ventas en tiempo real: un mesero crea un pedido y cocina/caja lo ven; cocina marca Listo y el mesero lo ve. Sin internet y sin servidor. Último cambio gana (por timestamp).
 - **Imprimir ticket (Bluetooth):** en el ticket, botón "Imprimir ticket". Usa `UIPrintInteractionController` (AirPrint) para imprimir el ticket como imagen, con el logo centrado y ajustado al ancho del papel. Se elige tamaño de papel (58mm o 80mm) y tamaño del logo (pequeño / mediano / grande), en el ticket y en Mi negocio.
+- **Funciones estilo Loyverse (y más):** descuentos por pedido (% o $) en Menú y al cerrar cuenta, con forma de pago (efectivo / tarjeta / transferencia); devoluciones de pedidos cobrados con motivo (ya no suman en ventas); Caja con fondo inicial, entradas/salidas de efectivo y corte por forma de pago; Clientes y lealtad (1 punto por cada $20, historial por cliente); Reportes (hoy / 7 días, venta promedio, por pago, lo más vendido, exportar ventas a CSV); pedidos en mesa / para llevar / a domicilio (con dirección y teléfono); inventario con importar/exportar CSV; variantes por platillo (ej. "Grande, sin cebolla"); escáner de código de barras con la cámara para buscar un platillo por su código (o código manual); Cocina por estado (Pendiente / En cocina / Listo) con el tiempo que lleva cada pedido.
 
 Datos de ejemplo incluidos. Todo se guarda en local, en `restaurante.json` en Documents del iPhone (JSON, con `FileManager` + `JSONEncoder`/`JSONDecoder`). Al cerrar y abrir la app, los pedidos y el inventario siguen ahí.
 
@@ -91,7 +92,7 @@ Edita `Sources/Restaurante/App.swift`, en la función `semilla()` dentro de `Dat
 
 ## Archivos
 
-- `project.yml` — proyecto xcodegen, target iOS, deploymentTarget 26.0, bundleId `com.tiki.softrestaurant`, permisos de red local (NSLocalNetworkUsageDescription + NSBonjourServices `_tiki-comanda._tcp`)
+- `project.yml` — proyecto xcodegen, target iOS, deploymentTarget 26.0, bundleId `com.tiki.softrestaurant`, permisos de red local (NSLocalNetworkUsageDescription + NSBonjourServices `_tiki-comanda._tcp`) y de cámara (NSCameraUsageDescription, para escanear códigos de barras)
 - `Sources/Restaurante/App.swift` — toda la app (modelos, datos, vistas)
 - `ExportOptions.plist` — exportar IPA
 - `PASOS.md` — pasos cortos

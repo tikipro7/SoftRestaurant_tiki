@@ -7,10 +7,11 @@ targets:
     platform: iOS
     deploymentTarget: "26.0"
     sources:
-      - path: Sources/Restaurante
+      - Sources/Restaurante
     info:
       properties:
         NSLocalNetworkUsageDescription: "Esta app busca otros iPhones del restaurante en tu WiFi para sincronizar mesas, pedidos e inventario."
+        NSCameraUsageDescription: "La cámara se usa para escanear el código de barras de un platillo y agregarlo al pedido."
         NSBonjourServices:
           - _tiki-comanda._tcp
     settings:
