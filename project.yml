@@ -1,0 +1,14 @@
+name: Restaurante
+options:
+  bundleIdPrefix: com.tiki.softrestaurant
+targets:
+  Restaurante:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Sources/Restaurante
+    settings:
+      GENERATE_INFOPLIST_FILE: YES
+      PRODUCT_BUNDLE_IDENTIFIER: com.tiki.softrestaurant
+      SWIFT_VERSION: "5.0"
