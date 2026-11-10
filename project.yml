@@ -8,6 +8,11 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - path: Sources/Restaurante
+    info:
+      properties:
+        NSLocalNetworkUsageDescription: "Esta app busca otros iPhones del restaurante en tu WiFi para sincronizar mesas, pedidos e inventario."
+        NSBonjourServices:
+          - _tiki-comanda._tcp
     settings:
       GENERATE_INFOPLIST_FILE: YES
       PRODUCT_BUNDLE_IDENTIFIER: com.tiki.softrestaurant

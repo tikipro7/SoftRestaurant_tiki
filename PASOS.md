@@ -1,6 +1,6 @@
 # Restaurante — PASOS
 
-App tipo Soft Restaurant para iPhone. Mesas, comanda, cocina, inventario, ventas y pedido del cliente.
+App tipo Soft Restaurant para iPhone. Mesas, comanda, cocina, inventario, ventas y pedido del cliente. Diseño estilo Loyverse POS: encabezado con gradiente, tarjetas con sombra, colores por estado, botones grandes.
 
 1. Copia esta carpeta a tu Mac: `~/restaurante-ios`
 2. En terminal, compila:
@@ -24,3 +24,8 @@ Cambiar el menú: edita `Sources/Restaurante/App.swift`, en `semilla()`, y vuelv
 - La app imprime con AirPrint (`UIPrintInteractionController`): agarra cualquier impresora que iOS reconozca como AirPrint / Bluetooth compatible, sin depender de una marca.
 - El ticket se genera como imagen, con el logo centrado y ajustado al ancho del papel (58mm = 384 puntos, 80mm = 576 puntos), para que no salga cortado ni chiquito.
 - Si tu térmica Bluetooth genérica no aparece en AirPrint, usa la app del fabricante de tu impresora y comparte el ticket desde "Compartir ticket" (texto) o toma captura del ticket en pantalla.
+
+## Red local (varios iPhones por WiFi)
+9. En cada iPhone: pestaña "Red local" → Encender red local. Acepta el permiso de red local la primera vez.
+10. Todos en el mismo WiFi, con WiFi y Bluetooth prendidos. En uno, toca Conectar en el otro iPhone.
+11. Crea un pedido en un iPhone: tiene que aparecer en Cocina del otro. Si cocina marca Listo, el mesero lo ve. Si no se ven, revisa el permiso en Ajustes del iPhone → Restaurante → Red local.
