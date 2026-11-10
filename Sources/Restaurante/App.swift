@@ -951,9 +951,9 @@ struct MesasView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     HStack(spacing: 8) {
-                        Image(systemName: "hand.tap.fill").foregroundStyle(.posNaranja)
+                        Image(systemName: "hand.tap.fill").foregroundStyle(Color.posNaranja)
                         Text("1. Toca una mesa  ·  2. Revisa su cuenta  ·  3. Cierra y cobra")
-                            .font(.callout).bold().foregroundStyle(.posTinta)
+                            .font(.callout).bold().foregroundStyle(Color.posTinta)
                     }
                     .tarjetaPOS()
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
@@ -1005,7 +1005,7 @@ struct MesasView: View {
 
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
-                            Image(systemName: "receipt.fill").foregroundStyle(.posNaranja)
+                            Image(systemName: "receipt.fill").foregroundStyle(Color.posNaranja)
                             Text("Mesa \(mesaSeleccionada)").font(.title2).bold()
                             Spacer()
                             let lista = store.pedidosDeMesa("Mesa \(mesaSeleccionada)")
@@ -1570,7 +1570,7 @@ struct ClienteView: View {
                             }
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(plato.nombre).font(.headline)
-                                Text(mxn(plato.precio)).font(.title3).bold().foregroundStyle(.posRojo)
+                                Text(mxn(plato.precio)).font(.title3).bold().foregroundStyle(Color.posRojo)
                             }
                             Spacer()
                             Button("Agregar") {
