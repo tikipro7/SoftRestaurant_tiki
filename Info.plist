@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Esta app busca otros iPhones del restaurante en tu WiFi para sincronizar mesas, pedidos e inventario.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>La cámara se usa para escanear el código de barras de un platillo y agregarlo al pedido.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_tiki-comanda._tcp</string>
+	</array>
+</dict>
+</plist>
