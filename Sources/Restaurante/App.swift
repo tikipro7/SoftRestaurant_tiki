@@ -935,6 +935,7 @@ struct ContentView: View {
             }
         }
         .background(Color.posFondo)
+        .preferredColorScheme(.light)
     }
 }
 
